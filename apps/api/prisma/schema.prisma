@@ -1,0 +1,626 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETION_PENDING
+}
+
+enum Theme {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+enum SemesterStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum CourseStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum SourceStatus {
+  UPLOADING
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+  DELETING
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum ChatMode {
+  EXPLAIN
+  SIMPLIFY
+  SUMMARIZE
+  STUDY
+  EXAM_PREP
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum MessageStatus {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
+enum SummaryType {
+  SHORT
+  DETAILED
+  EXAM_REVISION
+  KEY_POINTS
+}
+
+enum GenerationStatus {
+  GENERATING
+  READY
+  FAILED
+}
+
+enum ReviewRating {
+  KNOWN
+  DIFFICULT
+}
+
+enum QuizDifficulty {
+  EASY
+  MEDIUM
+  HARD
+  MIXED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+  ESSAY
+  PROBLEM_SOLVING
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  GRADING
+  SUBMITTED
+  ABANDONED
+}
+
+model User {
+  id                    String               @id @default(uuid()) @db.Uuid
+  email                 String               @unique @db.VarChar(254)
+  passwordHash          String
+  role                  UserRole             @default(STUDENT)
+  status                UserStatus           @default(ACTIVE)
+  emailVerifiedAt       DateTime?
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  deletedAt             DateTime?
+  profile               UserProfile?
+  sessions              AuthSession[]
+  passwordResetTokens   PasswordResetToken[]
+  semesters             Semester[]
+  courses               Course[]
+  sources               Source[]
+  chunks                DocumentChunk[]
+  conversations         Conversation[]
+  messages              Message[]
+  notes                 Note[]
+  summaries             Summary[]
+  flashcardSets         FlashcardSet[]
+  flashcards            Flashcard[]
+  reviews               FlashcardReview[]
+  quizzes               Quiz[]
+  attempts              QuizAttempt[]
+  topicMasteries        TopicMastery[]
+  activities            Activity[]
+  jobs                  Job[]
+}
+
+model AiTelemetryEvent {
+  id                    String   @id @default(uuid()) @db.Uuid
+  observedAt            DateTime @default(now())
+  level                 String   @db.VarChar(10)
+  event                 String   @db.VarChar(100)
+  pid                   Int?
+  feature               String?  @db.VarChar(80)
+  provider              String?  @db.VarChar(40)
+  model                  String?  @db.VarChar(120)
+  outcome                String?  @db.VarChar(30)
+  status                 Int?
+  providerRequests      Int?
+  estimatedInputTokens  Int?
+  promptTokens          Int?
+  outputTokens          Int?
+  thinkingTokens        Int?
+  batchCount            Int?
+  synthesisRequestCount Int?
+  cacheStatus           String?  @db.VarChar(30)
+  cacheHits             Int?
+  cacheMisses           Int?
+  sharedBatches         Int?
+  openAnswerCount       Int?
+  totalLatencyMs        Int?
+  metadata              Json
+  fingerprint           String?  @unique @db.VarChar(64)
+
+  @@index([observedAt])
+  @@index([event, observedAt])
+  @@index([provider, model, observedAt])
+  @@index([feature, observedAt])
+}
+
+model AiQuotaObservation {
+  id              String   @id @default(uuid()) @db.Uuid
+  provider        String   @db.VarChar(40)
+  model           String   @db.VarChar(120)
+  quotaId         String   @db.VarChar(240)
+  quotaMetric     String?  @db.VarChar(300)
+  quotaValue      Float?
+  quotaDimensions Json
+  rateLimitScope  String   @db.VarChar(20)
+  observedAt      DateTime @default(now())
+  resetAt         DateTime?
+  eventId         String?  @unique @db.Uuid
+
+  @@index([provider, model, observedAt])
+  @@index([quotaId, observedAt])
+}
+
+model UserProfile {
+  userId                 String   @id @db.Uuid
+  fullName               String   @db.VarChar(120)
+  universityName         String   @default("") @db.VarChar(160)
+  countryCode            String   @default("") @db.VarChar(3)
+  program                String   @default("") @db.VarChar(160)
+  faculty                String?  @db.VarChar(160)
+  academicYear           String?  @db.VarChar(40)
+  expectedGraduationYear Int?
+  studyLanguage          String   @default("English") @db.VarChar(40)
+  aiResponseLanguage     String   @default("English") @db.VarChar(40)
+  avatarObjectKey        String?
+  theme                  Theme    @default(SYSTEM)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  refreshTokenHash String
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastUsedAt       DateTime?
+  userAgent        String?
+  ipHash           String?
+  createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Semester {
+  id           String         @id @default(uuid()) @db.Uuid
+  userId       String         @db.Uuid
+  name         String         @db.VarChar(100)
+  academicYear String         @db.VarChar(40)
+  startDate    DateTime?      @db.Date
+  endDate      DateTime?      @db.Date
+  status       SemesterStatus @default(INACTIVE)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courses      Course[]
+
+  @@index([userId, status])
+}
+
+model Course {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @db.Uuid
+  semesterId     String          @db.Uuid
+  name           String          @db.VarChar(160)
+  code           String?         @db.VarChar(40)
+  description    String?         @db.VarChar(2000)
+  color          String?         @db.VarChar(7)
+  icon           String?         @db.VarChar(40)
+  status         CourseStatus    @default(ACTIVE)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  semester       Semester        @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  sources        Source[]
+  chunks         DocumentChunk[]
+  conversations  Conversation[]
+  notes          Note[]
+  summaries      Summary[]
+  flashcardSets  FlashcardSet[]
+  flashcards     Flashcard[]
+  quizzes        Quiz[]
+  topicMasteries TopicMastery[]
+  activities     Activity[]
+
+  @@index([userId, semesterId])
+}
+
+model Source {
+  id                     String               @id @default(uuid()) @db.Uuid
+  userId                 String               @db.Uuid
+  courseId               String               @db.Uuid
+  displayName            String
+  originalFileName       String
+  mimeType               String               @db.VarChar(120)
+  extension              String               @db.VarChar(12)
+  sizeBytes              Int
+  storageProvider        String               @db.VarChar(30)
+  storageKey             String               @unique
+  checksum               String               @db.VarChar(64)
+  processingStatus       SourceStatus         @default(QUEUED)
+  processingErrorCode    String?
+  processingErrorMessage String?
+  pageCount              Int?
+  extractedText          String?
+  processedAt            DateTime?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  user                   User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course                 Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chunks                 DocumentChunk[]
+  citations              Citation[]
+  summaryLinks           SummarySource[]
+  flashcardLinks         FlashcardSetSource[]
+  flashcards             Flashcard[]
+  quizLinks              QuizSource[]
+  questions              QuizQuestion[]
+
+  @@index([userId, courseId, processingStatus])
+}
+
+model DocumentChunk {
+  id             String                       @id @default(uuid()) @db.Uuid
+  userId         String                       @db.Uuid
+  courseId       String                       @db.Uuid
+  sourceId       String                       @db.Uuid
+  chunkIndex     Int
+  content        String
+  pageStart      Int?
+  pageEnd        Int?
+  tokenCount     Int
+  embedding      Unsupported("vector(1536)")?
+  embeddingModel String?
+  metadata       Json?
+  createdAt      DateTime                     @default(now())
+  user           User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course                       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  source         Source                       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  citations      Citation[]
+  questions      QuizQuestion[]
+
+  @@unique([sourceId, chunkIndex])
+  @@index([userId, courseId])
+}
+
+model Conversation {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  courseId  String    @db.Uuid
+  title     String    @db.VarChar(200)
+  mode      ChatMode  @default(EXPLAIN)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@index([userId, courseId, updatedAt])
+}
+
+model Message {
+  id               String        @id @default(uuid()) @db.Uuid
+  conversationId   String        @db.Uuid
+  userId           String        @db.Uuid
+  role             MessageRole
+  content          String
+  status           MessageStatus @default(COMPLETE)
+  modelProvider    String?
+  modelName        String?
+  promptTokens     Int?
+  completionTokens Int?
+  createdAt        DateTime      @default(now())
+  conversation     Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  citations        Citation[]
+
+  @@index([conversationId, createdAt])
+}
+
+model Citation {
+  id              String        @id @default(uuid()) @db.Uuid
+  messageId       String        @db.Uuid
+  sourceId        String        @db.Uuid
+  documentChunkId String        @db.Uuid
+  citationOrder   Int
+  pageStart       Int?
+  pageEnd         Int?
+  quotedExcerpt   String?       @db.VarChar(500)
+  createdAt       DateTime      @default(now())
+  message         Message       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  source          Source        @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  documentChunk   DocumentChunk @relation(fields: [documentChunkId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, citationOrder])
+}
+
+model Note {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  courseId      String   @db.Uuid
+  title         String   @db.VarChar(200)
+  content       String   @default("")
+  contentFormat String   @default("MARKDOWN") @db.VarChar(20)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, courseId, updatedAt])
+}
+
+model Summary {
+  id            String           @id @default(uuid()) @db.Uuid
+  userId        String           @db.Uuid
+  courseId      String           @db.Uuid
+  title         String           @db.VarChar(200)
+  content       String
+  type          SummaryType
+  status        GenerationStatus @default(READY)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  generationKey String?          @unique @db.VarChar(64)
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course        Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sources       SummarySource[]
+
+  @@index([userId, courseId, createdAt])
+}
+
+model SummarySource {
+  summaryId String  @db.Uuid
+  sourceId  String  @db.Uuid
+  summary   Summary @relation(fields: [summaryId], references: [id], onDelete: Cascade)
+  source    Source  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([summaryId, sourceId])
+}
+
+model FlashcardSet {
+  id            String               @id @default(uuid()) @db.Uuid
+  userId        String               @db.Uuid
+  courseId      String               @db.Uuid
+  title         String               @db.VarChar(200)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  generationKey String?              @unique @db.VarChar(64)
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course        Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sources       FlashcardSetSource[]
+  cards         Flashcard[]
+
+  @@index([userId, courseId, createdAt])
+}
+
+model FlashcardSetSource {
+  flashcardSetId String       @db.Uuid
+  sourceId       String       @db.Uuid
+  flashcardSet   FlashcardSet @relation(fields: [flashcardSetId], references: [id], onDelete: Cascade)
+  source         Source       @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([flashcardSetId, sourceId])
+}
+
+model Flashcard {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @db.Uuid
+  courseId       String            @db.Uuid
+  flashcardSetId String            @db.Uuid
+  sourceId       String?           @db.Uuid
+  front          String
+  back           String
+  topic          String            @db.VarChar(160)
+  difficulty     QuizDifficulty    @default(MEDIUM)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course            @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  flashcardSet   FlashcardSet      @relation(fields: [flashcardSetId], references: [id], onDelete: Cascade)
+  source         Source?           @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  reviews        FlashcardReview[]
+}
+
+model FlashcardReview {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @db.Uuid
+  flashcardId String       @db.Uuid
+  rating      ReviewRating
+  reviewedAt  DateTime     @default(now())
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flashcard   Flashcard    @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+
+  @@index([userId, reviewedAt])
+}
+
+model Quiz {
+  id            String           @id @default(uuid()) @db.Uuid
+  userId        String           @db.Uuid
+  courseId      String           @db.Uuid
+  title         String           @db.VarChar(200)
+  difficulty    QuizDifficulty
+  status        GenerationStatus @default(READY)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  generationKey String?          @unique @db.VarChar(64)
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course        Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  sources       QuizSource[]
+  questions     QuizQuestion[]
+  attempts      QuizAttempt[]
+
+  @@index([userId, courseId, createdAt])
+}
+
+model QuizSource {
+  quizId   String @db.Uuid
+  sourceId String @db.Uuid
+  quiz     Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  source   Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([quizId, sourceId])
+}
+
+model QuizQuestion {
+  id              String         @id @default(uuid()) @db.Uuid
+  quizId          String         @db.Uuid
+  position        Int
+  type            QuestionType
+  prompt          String
+  options         Json
+  correctAnswer   String
+  explanation     String
+  topic           String         @db.VarChar(160)
+  difficulty      QuizDifficulty @default(MEDIUM)
+  sourceId        String?        @db.Uuid
+  documentChunkId String?        @db.Uuid
+  createdAt       DateTime       @default(now())
+  quiz            Quiz           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  source          Source?        @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  documentChunk   DocumentChunk? @relation(fields: [documentChunkId], references: [id], onDelete: SetNull)
+  answers         QuizAnswer[]
+
+  @@unique([quizId, position])
+}
+
+model QuizAttempt {
+  id             String        @id @default(uuid()) @db.Uuid
+  userId         String        @db.Uuid
+  quizId         String        @db.Uuid
+  status         AttemptStatus @default(IN_PROGRESS)
+  scorePercent   Float?
+  correctCount   Int?
+  incorrectCount Int?
+  startedAt      DateTime      @default(now())
+  submittedAt    DateTime?
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz           Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers        QuizAnswer[]
+
+  @@index([userId, quizId, startedAt])
+}
+
+model QuizAnswer {
+  id             String       @id @default(uuid()) @db.Uuid
+  attemptId      String       @db.Uuid
+  questionId     String       @db.Uuid
+  selectedAnswer String
+  isCorrect      Boolean?
+  scorePercent   Float?
+  feedback       String?
+  gradingKey     String?      @db.VarChar(64)
+  gradingMissed  Json?
+  answeredAt     DateTime     @default(now())
+  attempt        QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question       QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([gradingKey])
+}
+
+model TopicMastery {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  courseId       String   @db.Uuid
+  topic          String   @db.VarChar(160)
+  correctAnswers Int      @default(0)
+  totalAnswers   Int      @default(0)
+  masteryPercent Float    @default(0)
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId, topic])
+}
+
+model Activity {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  courseId   String?  @db.Uuid
+  type       String   @db.VarChar(60)
+  entityType String?  @db.VarChar(60)
+  entityId   String?  @db.Uuid
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Job {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  type         String    @db.VarChar(60)
+  status       JobStatus @default(QUEUED)
+  entityType   String    @db.VarChar(60)
+  entityId     String    @db.Uuid
+  payload      Json
+  attemptCount Int       @default(0)
+  maxAttempts  Int       @default(3)
+  availableAt  DateTime  @default(now())
+  lockedAt     DateTime?
+  lockedBy     String?
+  errorCode    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  completedAt  DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+}
