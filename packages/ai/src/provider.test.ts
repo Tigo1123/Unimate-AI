@@ -235,8 +235,27 @@ describe('remote chat providers', () => {
       }),
     );
     const correctionBody = JSON.parse(request.mock.calls[1]![1].body as string);
+    const initialBody = JSON.parse(request.mock.calls[0]![1].body as string);
+    expect(initialBody.generationConfig.responseJsonSchema).toEqual({
+      type: 'object',
+      properties: {
+        questions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: { prompt: { type: 'string' } },
+            required: ['prompt'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['questions'],
+      additionalProperties: false,
+    });
     expect(JSON.stringify(correctionBody)).toContain('questions.0.prompt');
     expect(JSON.stringify(correctionBody)).toContain('{\\"questions\\":[{\\"prompt\\":7}]}');
+    expect(JSON.stringify(correctionBody)).toContain('do not wrap it in a \\"quiz\\" property');
+    expect(JSON.stringify(correctionBody)).toContain('REQUIRED_JSON_SCHEMA');
   });
 
   it('does not retry Gemini RESOURCE_EXHAUSTED and preserves RetryInfo', async () => {

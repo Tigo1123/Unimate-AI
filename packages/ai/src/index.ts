@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 export {
   loadAIEnvironment,
   loadRootEnvironment,
@@ -205,10 +206,33 @@ function structuredOutputFailure(error: unknown) {
   };
 }
 
-function structuredOutputCorrection(raw: string, failure: ReturnType<typeof structuredOutputFailure>) {
+function geminiResponseJsonSchema(schema: z.ZodType<unknown>) {
+  const jsonSchema = zodToJsonSchema(schema, { target: 'openApi3', $refStrategy: 'none' });
+  // Gemini supports a JSON Schema subset. String length constraints remain enforced by Zod.
+  const removeUnsupportedKeywords = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(removeUnsupportedKeywords);
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => key !== 'minLength' && key !== 'maxLength' && key !== '$schema')
+        .map(([key, child]) => [key, removeUnsupportedKeywords(child)]),
+    );
+  };
+  return removeUnsupportedKeywords(jsonSchema) as Record<string, unknown>;
+}
+
+function structuredOutputCorrection(
+  raw: string,
+  failure: ReturnType<typeof structuredOutputFailure>,
+  schemaName: string,
+  responseSchema?: Record<string, unknown>,
+) {
   const retained = raw.slice(0, STRUCTURED_OUTPUT_CORRECTION_CHARACTERS);
   const truncation = retained.length < raw.length ? '\n[invalid output truncated]' : '';
-  return `Correct the structured output below and return JSON only. Preserve valid content while fixing every listed error.\n\nVALIDATION_ERRORS:\n${failure.message}\n\nINVALID_OUTPUT:\n${retained}${truncation}`;
+  const schemaInstruction = responseSchema
+    ? `\n\nREQUIRED_JSON_SCHEMA:\n${JSON.stringify(responseSchema)}`
+    : '';
+  return `Correct the structured output below and return JSON only. Preserve valid content while fixing every listed error. Return the schema's object directly; do not wrap it in a "${schemaName}" property.${schemaInstruction}\n\nVALIDATION_ERRORS:\n${failure.message}\n\nINVALID_OUTPUT:\n${retained}${truncation}`;
 }
 
 function logStructuredOutputFailure(
@@ -397,7 +421,7 @@ export class OpenAIProvider implements AIProvider {
           );
         messages.push({
           role: 'user',
-          content: structuredOutputCorrection(raw ?? '', failure),
+          content: structuredOutputCorrection(raw ?? '', failure, input.schemaName),
         });
       }
     }
@@ -706,11 +730,12 @@ export class GeminiProvider implements AIProvider {
     schemaName: string;
     maxOutputTokens?: number;
   }) {
+    const responseJsonSchema = geminiResponseJsonSchema(input.schema);
     const messages = [
       ...input.messages,
       {
         role: 'user' as const,
-        content: `Return one JSON object matching the requested ${input.schemaName} structure.`,
+        content: `Return the JSON object described by the response schema directly. Do not wrap it in a "${input.schemaName}" property.`,
       },
     ];
     let providerRequests = 0;
@@ -719,6 +744,7 @@ export class GeminiProvider implements AIProvider {
         geminiRequest(messages, {
           maxOutputTokens: input.maxOutputTokens ?? this.config.maxOutputTokens,
           responseMimeType: 'application/json',
+          responseJsonSchema,
           thinkingConfig: { thinkingLevel: 'low' },
           ...(this.config.temperature !== undefined && !/^gemini-3(?:\.|-)/.test(this.chatModel)
             ? { temperature: this.config.temperature }
@@ -761,7 +787,12 @@ export class GeminiProvider implements AIProvider {
           );
         messages.push({
           role: 'user',
-          content: structuredOutputCorrection(raw ?? '', failure),
+          content: structuredOutputCorrection(
+            raw ?? '',
+            failure,
+            input.schemaName,
+            responseJsonSchema,
+          ),
         });
       }
     }
