@@ -208,17 +208,29 @@ function structuredOutputFailure(error: unknown) {
 
 function geminiResponseJsonSchema(schema: z.ZodType<unknown>) {
   const jsonSchema = zodToJsonSchema(schema, { target: 'openApi3', $refStrategy: 'none' });
-  // Gemini supports a JSON Schema subset. String length constraints remain enforced by Zod.
-  const removeUnsupportedKeywords = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(removeUnsupportedKeywords);
+  // Keep the wire schema deliberately smaller than the full JSON Schema emitted by Zod.
+  // Gemini validates the final value only against a subset; Zod remains the authority for
+  // length, range, unknown-key, and other application constraints after generation.
+  const supportedKeywords = new Set([
+    'type',
+    'properties',
+    'required',
+    'items',
+    'enum',
+    'title',
+    'description',
+  ]);
+  const sanitize = (value: unknown, parentKey?: string): unknown => {
+    if (Array.isArray(value)) return value.map((child) => sanitize(child));
     if (!value || typeof value !== 'object') return value;
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .filter(([key]) => key !== 'minLength' && key !== 'maxLength' && key !== '$schema')
-        .map(([key, child]) => [key, removeUnsupportedKeywords(child)]),
+        // Property names are user-defined, so only filter keys that are schema keywords.
+        .filter(([key]) => parentKey === 'properties' || supportedKeywords.has(key))
+        .map(([key, child]) => [key, sanitize(child, key)]),
     );
   };
-  return removeUnsupportedKeywords(jsonSchema) as Record<string, unknown>;
+  return sanitize(jsonSchema) as Record<string, unknown>;
 }
 
 function structuredOutputCorrection(

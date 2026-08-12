@@ -187,7 +187,7 @@ describe('remote chat providers', () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            candidates: [{ content: { parts: [{ text: '{"questions":[{"prompt":7}]}' }] } }],
+            candidates: [{ content: { parts: [{ text: '{"questions":[{"prompt":7,"index":0}]}' }] } }],
             modelVersion: 'gemini-test',
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -196,7 +196,7 @@ describe('remote chat providers', () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            candidates: [{ content: { parts: [{ text: '{"questions":[{"prompt":"Fixed"}]}' }] } }],
+            candidates: [{ content: { parts: [{ text: '{"questions":[{"prompt":"Fixed","index":0}]}' }] } }],
             modelVersion: 'gemini-test',
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -217,7 +217,12 @@ describe('remote chat providers', () => {
     await expect(
       gemini.generateStructured({
         messages: [],
-        schema: z.object({ questions: z.array(z.object({ prompt: z.string() })) }),
+        schema: z.object({
+          questions: z
+            .array(z.object({ prompt: z.string().min(5).max(200), index: z.number().int().nonnegative() }))
+            .min(1)
+            .max(30),
+        }),
         schemaName: 'quiz',
         mockValue: { questions: [] },
       }),
@@ -228,7 +233,7 @@ describe('remote chat providers', () => {
       expect.objectContaining({
         schemaName: 'quiz',
         failureKind: 'schema_validation',
-        rawResponsePreview: '{"questions":[{"prompt":7}]}',
+        rawResponsePreview: '{"questions":[{"prompt":7,"index":0}]}',
         validationIssues: expect.arrayContaining([
           expect.objectContaining({ path: 'questions.0.prompt', message: 'Expected string, received number' }),
         ]),
@@ -243,17 +248,17 @@ describe('remote chat providers', () => {
           type: 'array',
           items: {
             type: 'object',
-            properties: { prompt: { type: 'string' } },
-            required: ['prompt'],
-            additionalProperties: false,
+            properties: { prompt: { type: 'string' }, index: { type: 'integer' } },
+            required: ['prompt', 'index'],
           },
         },
       },
       required: ['questions'],
-      additionalProperties: false,
     });
     expect(JSON.stringify(correctionBody)).toContain('questions.0.prompt');
-    expect(JSON.stringify(correctionBody)).toContain('{\\"questions\\":[{\\"prompt\\":7}]}');
+    expect(JSON.stringify(correctionBody)).toContain(
+      '{\\"questions\\":[{\\"prompt\\":7,\\"index\\":0}]}',
+    );
     expect(JSON.stringify(correctionBody)).toContain('do not wrap it in a \\"quiz\\" property');
     expect(JSON.stringify(correctionBody)).toContain('REQUIRED_JSON_SCHEMA');
   });
