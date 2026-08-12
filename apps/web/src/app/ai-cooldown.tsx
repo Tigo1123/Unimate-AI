@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useTranslation } from '../i18n';
 
 const STORAGE_KEY = 'unimateAiCooldownUntil';
 const SCOPE_STORAGE_KEY = 'unimateAiCooldownScope';
@@ -89,6 +90,7 @@ export function useAiCooldown() {
 }
 
 export function AiCooldownNotice() {
+  const { t } = useTranslation();
   const { coolingDown, secondsRemaining, rateLimitScope } = useAiCooldown();
   if (!coolingDown) return null;
   return (
@@ -97,11 +99,11 @@ export function AiCooldownNotice() {
       role="status"
       aria-live="polite"
     >
-      <span className="block text-lg">AI generation is temporarily paused</span>
+      <span className="block text-lg">{t('cooldown.title')}</span>
       <span className="mt-1 block font-semibold">
         {rateLimitScope === 'DAY'
-          ? `Gemini's free daily quota is exhausted. AI actions are disabled until the midnight-Pacific reset (about ${formatAiCooldown(secondsRemaining)}).`
-          : `Gemini is rate-limited. Every generation action is disabled for ${formatAiCooldown(secondsRemaining)}.`}
+          ? t('cooldown.daily', { time: formatAiCooldown(secondsRemaining) })
+          : t('cooldown.limited', { time: formatAiCooldown(secondsRemaining) })}
       </span>
     </div>
   );

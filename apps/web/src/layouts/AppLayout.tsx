@@ -10,21 +10,23 @@ import {
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../app/auth';
 import { ThemeToggle } from '../app/theme';
+import { LanguageToggle, useTranslation } from '../i18n';
 
 export function AppLayout() {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const links = [
-    { to: '/app', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/app/semesters', label: 'Semesters', icon: GraduationCap },
-    { to: '/app/search', label: 'Search', icon: Search },
+    { to: '/app', label: t('nav.dashboard'), icon: LayoutDashboard },
+    { to: '/app/semesters', label: t('nav.semesters'), icon: GraduationCap },
+    { to: '/app/search', label: t('nav.search'), icon: Search },
     ...(user?.role === 'ADMIN'
-      ? [{ to: '/app/ai-usage', label: 'AI usage', icon: BarChart3 }]
+      ? [{ to: '/app/ai-usage', label: t('nav.aiUsage'), icon: BarChart3 }]
       : []),
-    { to: '/app/settings', label: 'Settings', icon: Settings },
+    { to: '/app/settings', label: t('nav.settings'), icon: Settings },
   ];
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[250px_1fr]">
-      <aside className="border-b border-slate-200 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 lg:min-h-screen lg:border-b-0 lg:border-r">
+      <aside className="border-b border-slate-200 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 lg:min-h-screen lg:border-b-0 ltr:lg:border-r rtl:lg:border-l">
         <div className="mb-6 flex items-center justify-between gap-2 px-2">
           <NavLink to="/app" className="flex items-center gap-2 text-lg font-bold">
             <span className="grid size-9 place-items-center rounded-xl bg-brand-600 text-white">
@@ -32,7 +34,10 @@ export function AppLayout() {
             </span>
             UniMate AI
           </NavLink>
-          <ThemeToggle className="lg:hidden" />
+          <div className="flex gap-2 lg:hidden">
+            <LanguageToggle />
+            <ThemeToggle />
+          </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto lg:flex-col">
           {links.map(({ to, label, icon: Icon }) => (
@@ -53,9 +58,10 @@ export function AppLayout() {
           <p className="truncate px-2 text-sm font-semibold">{user?.profile?.fullName}</p>
           <p className="truncate px-2 text-xs text-slate-500">{user?.email}</p>
           <div className="mt-3 flex">
+            <LanguageToggle />
             <ThemeToggle />
             <button className="btn px-2 text-red-600" onClick={() => void logout()}>
-              <LogOut size={17} /> Logout
+              <LogOut size={17} /> {t('nav.logout')}
             </button>
           </div>
         </div>

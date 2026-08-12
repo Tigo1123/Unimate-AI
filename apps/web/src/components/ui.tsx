@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import { ApiError } from '../lib/api';
+import { useTranslation } from '../i18n';
 export function Loading() {
+  const { t } = useTranslation();
   return (
-    <div className="grid min-h-[40vh] place-items-center text-slate-500">Loading UniMate…</div>
+    <div className="grid min-h-[40vh] place-items-center text-slate-500">{t('common.loading')}</div>
   );
 }
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
@@ -16,6 +18,7 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
   );
 }
 export function ErrorBox({ error }: { error: unknown }) {
+  const { t } = useTranslation();
   const rateLimited = error instanceof ApiError && error.code === 'AI_RATE_LIMITED';
   return error ? (
     <div
@@ -27,11 +30,11 @@ export function ErrorBox({ error }: { error: unknown }) {
           : 'rounded-xl bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300'
       }
     >
-      {rateLimited ? <strong className="mb-1 block text-lg">AI generation paused</strong> : null}
-      <span>{error instanceof Error ? error.message : 'Something went wrong.'}</span>
+      {rateLimited ? <strong className="mb-1 block text-lg">{t('error.aiPaused')}</strong> : null}
+      <span>{error instanceof Error ? error.message : t('error.generic')}</span>
       {error instanceof ApiError && error.requestId ? (
         <span className="mt-2 block text-xs font-normal opacity-80">
-          Request ID: {error.requestId}
+          {t('error.requestId', { id: error.requestId })}
         </span>
       ) : null}
     </div>

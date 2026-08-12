@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../app/auth';
 import { Empty, Loading } from '../components/ui';
 import { api } from '../lib/api';
+import { useTranslation } from '../i18n';
 type DashboardData = {
   activeSemester?: { name: string } | null;
   courses: {
@@ -19,6 +20,7 @@ type DashboardData = {
 };
 export function Dashboard() {
   const { user } = useAuth();
+  const { language, t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api.get<DashboardData>('/dashboard'),
@@ -29,23 +31,25 @@ export function Dashboard() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm text-slate-500">
-            {data?.activeSemester?.name ?? 'No active semester'}
+            {data?.activeSemester?.name ?? t('dashboard.noSemester')}
           </p>
           <h1 className="text-3xl font-bold">
-            Welcome back, {user?.profile?.fullName?.split(' ')[0] ?? 'student'}.
+            {t('dashboard.welcome', {
+              name: user?.profile?.fullName?.split(' ')[0] ?? t('dashboard.student'),
+            })}
           </h1>
-          <p className="mt-1 text-slate-500">What will you understand better today?</p>
+          <p className="mt-1 text-slate-500">{t('dashboard.subtitle')}</p>
         </div>
         <Link to="/app/semesters" className="btn-primary">
           <Plus size={17} />
-          Add course
+          {t('dashboard.addCourse')}
         </Link>
       </header>
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold">Your courses</h2>
+          <h2 className="text-xl font-bold">{t('dashboard.yourCourses')}</h2>
           <Link className="text-sm font-semibold text-brand-600" to="/app/semesters">
-            Manage semesters
+            {t('dashboard.manageSemesters')}
           </Link>
         </div>
         {data?.courses.length ? (
@@ -59,28 +63,26 @@ export function Dashboard() {
                   <BookOpen size={20} />
                 </span>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                  {c.code || 'Course'}
+                  {c.code || t('dashboard.courseFallback')}
                 </p>
                 <h3 className="mt-1 text-lg font-bold group-hover:text-brand-600">{c.name}</h3>
                 <div className="mt-4 flex gap-4 text-xs text-slate-500">
-                  <span>{c._count.sources} sources</span>
-                  <span>{c._count.quizzes} quizzes</span>
-                  <ArrowRight className="ml-auto" size={16} />
+                  <span>{t('dashboard.sources', { count: c._count.sources })}</span>
+                  <span>{t('dashboard.quizzes', { count: c._count.quizzes })}</span>
+                  <ArrowRight className="ms-auto rtl:rotate-180" size={16} />
                 </div>
               </Link>
             ))}
           </div>
         ) : (
-          <Empty title="Create your first course">
-            Add a semester and course to begin uploading study materials.
-          </Empty>
+          <Empty title={t('dashboard.emptyTitle')}>{t('dashboard.emptyBody')}</Empty>
         )}
       </section>
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <section className="card">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
             <Sparkles className="text-brand-600" />
-            Continue studying
+            {t('dashboard.continueStudying')}
           </h2>
           {data?.courses[0] ? (
             <Link
@@ -89,16 +91,16 @@ export function Dashboard() {
             >
               <span>
                 <b>{data.courses[0].name}</b>
-                <small className="block">Ask a question from your material</small>
+                <small className="block">{t('dashboard.askMaterial')}</small>
               </span>
-              <ArrowRight />
+              <ArrowRight className="rtl:rotate-180" />
             </Link>
           ) : (
-            <p className="text-sm text-slate-500">Your next study action will appear here.</p>
+            <p className="text-sm text-slate-500">{t('dashboard.nextAction')}</p>
           )}
         </section>
         <section className="card">
-          <h2 className="mb-4 text-lg font-bold">Recent activity</h2>
+          <h2 className="mb-4 text-lg font-bold">{t('dashboard.recentActivity')}</h2>
           {data?.activities.length ? (
             <ul className="space-y-4">
               {data.activities.slice(0, 5).map((a) => (
@@ -107,14 +109,14 @@ export function Dashboard() {
                   <span>
                     {a.type.toLowerCase().replaceAll('_', ' ')}
                     <small className="block text-slate-400">
-                      {new Date(a.createdAt).toLocaleDateString()}
+                      {new Date(a.createdAt).toLocaleDateString(language)}
                     </small>
                   </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-slate-500">No study activity yet.</p>
+            <p className="text-sm text-slate-500">{t('dashboard.noActivity')}</p>
           )}
         </section>
       </div>

@@ -1,5 +1,6 @@
 import { Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from '../i18n';
 
 export type Theme = 'light' | 'dark';
 const STORAGE_KEY = 'unimateTheme';
@@ -20,6 +21,7 @@ export function initializeTheme() {
 }
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
+  const { t } = useTranslation();
   const [theme, setTheme] = useState<Theme>(() => preferredTheme());
   function toggle() {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -29,10 +31,10 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
   }
   return (
     <button
-      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      aria-label={t(theme === 'dark' ? 'theme.switchToLight' : 'theme.switchToDark')}
       className={`btn-secondary size-10 p-0 ${className}`}
       onClick={toggle}
-      title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      title={t(theme === 'dark' ? 'theme.switchToLight' : 'theme.switchToDark')}
       type="button"
     >
       {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}

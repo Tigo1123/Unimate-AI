@@ -22,7 +22,7 @@ export function MarkdownContent({
   className?: string;
 }) {
   return (
-    <div className={`markdown-content ${className}`}>
+    <div className={`markdown-content ${className}`} dir="ltr">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

@@ -14,6 +14,7 @@ import { MarkdownContent } from '../components/MarkdownContent';
 import { Empty, ErrorBox, Loading } from '../components/ui';
 import { api } from '../lib/api';
 import { AiCooldownNotice, formatAiCooldown, useAiCooldown } from '../app/ai-cooldown';
+import { useTranslation } from '../i18n';
 
 type Course = {
   id: string;
@@ -43,18 +44,19 @@ function useAIStatus() {
   });
 }
 const tabs = [
-  ['', BookOpen, 'Overview'],
-  ['sources', FileText, 'Sources'],
-  ['chat', MessageSquare, 'AI Chat'],
-  ['explain', Sparkles, 'Explain'],
-  ['notes', NotebookPen, 'Notes'],
-  ['summaries', Sparkles, 'Summaries'],
-  ['flashcards', BookOpen, 'Flashcards'],
-  ['quizzes', Trophy, 'Quizzes'],
-  ['progress', Trophy, 'Progress'],
+  ['', BookOpen, 'overview'],
+  ['sources', FileText, 'sources'],
+  ['chat', MessageSquare, 'chat'],
+  ['explain', Sparkles, 'explain'],
+  ['notes', NotebookPen, 'notes'],
+  ['summaries', Sparkles, 'summaries'],
+  ['flashcards', BookOpen, 'flashcards'],
+  ['quizzes', Trophy, 'quizzes'],
+  ['progress', Trophy, 'progress'],
 ] as const;
 
 export function CoursePage({ tab = '' }: { tab?: string }) {
+  const { t } = useTranslation();
   const { id = '' } = useParams();
   const query = useQuery({
     queryKey: ['course', id],
@@ -62,22 +64,30 @@ export function CoursePage({ tab = '' }: { tab?: string }) {
   });
   const aiStatus = useAIStatus();
   if (query.isLoading) return <Loading />;
-  if (!query.data) return <Empty title="Course not found" />;
+  if (!query.data) return <Empty title={t('course.notFound')} />;
   return (
     <div className="space-y-7">
       <header>
         <p className="text-sm font-semibold text-brand-600">
-          {query.data.code || 'Course workspace'}
+          {query.data.code || t('course.workspace')}
         </p>
         <h1 className="text-3xl font-bold">{query.data.name}</h1>
-        <p className="text-slate-500">
-          {query.data.description || 'Study from your own course materials.'}
-        </p>
+        <p className="text-slate-500">{query.data.description || t('course.description')}</p>
         <div
           className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold ${aiStatus.data?.mode === 'AI_TUTOR' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200'}`}
-          title={aiStatus.data?.message}
+          title={
+            aiStatus.data
+              ? t(
+                  aiStatus.data.mode === 'AI_TUTOR'
+                    ? 'course.aiTutorMessage'
+                    : 'course.demoMessage',
+                )
+              : undefined
+          }
         >
-          {aiStatus.data?.label ?? 'Checking AI mode…'}
+          {aiStatus.data
+            ? t(aiStatus.data.mode === 'AI_TUTOR' ? 'course.aiTutor' : 'course.demoMode')
+            : t('course.checkingAi')}
         </div>
       </header>
       <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800">
@@ -91,7 +101,7 @@ export function CoursePage({ tab = '' }: { tab?: string }) {
             }
           >
             <Icon size={16} />
-            {label}
+            {t(`course.tabs.${label}`)}
           </NavLink>
         ))}
       </nav>
@@ -110,13 +120,14 @@ export function CoursePage({ tab = '' }: { tab?: string }) {
 }
 
 function Overview({ course }: { course: Course }) {
+  const { t } = useTranslation();
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {[
-        ['Sources', course._count.sources],
-        ['Notes', course._count.notes],
-        ['Quizzes', course._count.quizzes],
-        ['Flashcards', course._count.flashcards],
+        [t('course.overview.sources'), course._count.sources],
+        [t('course.overview.notes'), course._count.notes],
+        [t('course.overview.quizzes'), course._count.quizzes],
+        [t('course.overview.flashcards'), course._count.flashcards],
       ].map(([label, value]) => (
         <div className="card" key={label}>
           <p className="text-sm text-slate-500">{label}</p>
@@ -128,6 +139,7 @@ function Overview({ course }: { course: Course }) {
 }
 
 function Sources({ courseId }: { courseId: string }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [error, setError] = useState<unknown>();
   const [uploading, setUploading] = useState(false);
@@ -158,7 +170,7 @@ function Sources({ courseId }: { courseId: string }) {
     <div className="space-y-5">
       <form className="card flex flex-wrap items-end gap-3" onSubmit={upload}>
         <label className="min-w-56 flex-1">
-          <span className="label">Upload PDF, DOCX, PPTX, TXT, or Markdown</span>
+          <span className="label">{t('course.upload.label')}</span>
           <input
             className="field"
             name="file"
@@ -169,7 +181,7 @@ function Sources({ courseId }: { courseId: string }) {
         </label>
         <button className="btn-primary" disabled={uploading}>
           <Upload size={17} />
-          {uploading ? 'Uploading…' : 'Upload source'}
+          {uploading ? t('course.upload.uploading') : t('course.upload.button')}
         </button>
       </form>
       <ErrorBox error={error} />
@@ -185,15 +197,15 @@ function Sources({ courseId }: { courseId: string }) {
                   {source.pageCount ? `· ${source.pageCount} pages` : ''}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="text-end">
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold dark:bg-slate-800">
                   {source.processingStatus === 'QUEUED'
-                    ? 'Creating study index…'
+                    ? t('course.upload.indexing')
                     : source.processingStatus === 'PROCESSING'
-                      ? 'Processing…'
+                      ? t('course.upload.processing')
                       : source.processingStatus === 'READY'
-                        ? 'Ready'
-                        : 'Processing failed'}
+                        ? t('course.upload.ready')
+                        : t('course.upload.failed')}
                 </span>
                 {source.processingStatus === 'FAILED' && (
                   <div className="mt-2">
@@ -205,7 +217,7 @@ function Sources({ courseId }: { courseId: string }) {
                           .then(() => qc.invalidateQueries({ queryKey: ['sources', courseId] }))
                       }
                     >
-                      Retry
+                      {t('common.retry')}
                     </button>
                   </div>
                 )}
@@ -218,13 +230,13 @@ function Sources({ courseId }: { courseId: string }) {
                     .then(() => qc.invalidateQueries({ queryKey: ['sources', courseId] }))
                 }
               >
-                Delete
+                {t('common.delete')}
               </button>
             </div>
           ))}
         </div>
       ) : (
-        <Empty title="No sources yet">Upload material to make this course interactive.</Empty>
+        <Empty title={t('course.upload.emptyTitle')}>{t('course.upload.emptyBody')}</Empty>
       )}
     </div>
   );
@@ -255,35 +267,41 @@ type Message = {
 };
 type StudyAction =
   'EXPLAIN' | 'SUMMARIZE' | 'CREATE_EXAM_QUESTIONS' | 'STUDY_FIRST' | 'SIMPLIFY' | 'EXAM_PREP';
-const studyActions: { action: StudyAction; label: string; prompt: string; mode: string }[] = [
-  { action: 'EXPLAIN', label: 'Explain', prompt: 'Explain this lecture', mode: 'EXPLAIN' },
-  { action: 'SUMMARIZE', label: 'Summarize', prompt: 'Summarize this lecture', mode: 'SUMMARIZE' },
+const studyActions: { action: StudyAction; labelKey: string; prompt: string; mode: string }[] = [
+  { action: 'EXPLAIN', labelKey: 'explain', prompt: 'Explain this lecture', mode: 'EXPLAIN' },
+  {
+    action: 'SUMMARIZE',
+    labelKey: 'summarize',
+    prompt: 'Summarize this lecture',
+    mode: 'SUMMARIZE',
+  },
   {
     action: 'CREATE_EXAM_QUESTIONS',
-    label: 'Create exam questions',
+    labelKey: 'examQuestions',
     prompt: 'Create exam questions from this lecture',
     mode: 'EXAM_PREP',
   },
   {
     action: 'STUDY_FIRST',
-    label: 'Study first',
+    labelKey: 'studyFirst',
     prompt: 'What should I study first?',
     mode: 'STUDY',
   },
   {
     action: 'SIMPLIFY',
-    label: 'Simplify',
+    labelKey: 'simplify',
     prompt: 'Explain this lecture in simple words',
     mode: 'SIMPLIFY',
   },
   {
     action: 'EXAM_PREP',
-    label: 'Exam prep',
+    labelKey: 'examPrep',
     prompt: 'Prepare me for an exam on this lecture',
     mode: 'EXAM_PREP',
   },
 ];
 function Chat({ courseId }: { courseId: string }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [active, setActive] = useState<string>();
   const [error, setError] = useState<unknown>();
@@ -322,7 +340,7 @@ function Chat({ courseId }: { courseId: string }) {
       let id = active;
       if (!id) {
         const created = await api.post<Conversation>(`/courses/${courseId}/conversations`, {
-          title: 'New conversation',
+          title: t('course.chat.newConversation'),
           mode: 'EXPLAIN',
         });
         id = created.id;
@@ -353,11 +371,11 @@ function Chat({ courseId }: { courseId: string }) {
     <div className="grid gap-5 lg:grid-cols-[230px_1fr]">
       <aside className="card h-fit">
         <button className="btn-primary mb-4 w-full" onClick={() => setActive(undefined)}>
-          New chat
+          {t('course.chat.new')}
         </button>
         {conversations.data?.map((item) => (
           <button
-            className={`block w-full truncate rounded-lg p-2 text-left text-sm ${active === item.id ? 'bg-brand-50 text-brand-700' : ''}`}
+            className={`block w-full truncate rounded-lg p-2 text-start text-sm ${active === item.id ? 'bg-brand-50 text-brand-700' : ''}`}
             key={item.id}
             onClick={() => setActive(item.id)}
           >
@@ -369,16 +387,20 @@ function Chat({ courseId }: { courseId: string }) {
         <div
           className={`mb-4 rounded-xl px-3 py-2 text-sm font-medium ${aiStatus.data?.mode === 'AI_TUTOR' ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-200'}`}
         >
-          {aiStatus.data?.message ?? 'Checking tutor mode…'}
+          {aiStatus.data
+            ? t(aiStatus.data.mode === 'AI_TUTOR' ? 'course.aiTutorMessage' : 'course.demoMessage')
+            : t('course.checkingTutor')}
         </div>
         <div className="mb-4 border-b border-slate-200 pb-4 dark:border-slate-800">
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Source scope</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            {t('course.chat.sourceScope')}
+          </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               className={`rounded-full px-3 py-1 text-xs font-semibold ${sourceIds.length ? 'bg-slate-100 dark:bg-slate-800' : 'bg-brand-600 text-white'}`}
               onClick={() => setSourceIds([])}
             >
-              All ready sources
+              {t('course.chat.allSources')}
             </button>
             {readySources.map((source) => (
               <button
@@ -402,7 +424,7 @@ function Chat({ courseId }: { courseId: string }) {
             <article
               className={
                 message.role === 'USER'
-                  ? 'ml-auto max-w-2xl rounded-2xl bg-brand-600 p-4 text-white'
+                  ? 'ms-auto max-w-2xl rounded-2xl bg-brand-600 p-4 text-white'
                   : 'max-w-3xl'
               }
               key={message.id}
@@ -411,7 +433,7 @@ function Chat({ courseId }: { courseId: string }) {
               {message.citations?.length ? (
                 <div className="mt-3 space-y-2">
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                    Sources
+                    {t('course.chat.sources')}
                   </p>
                   {message.citations.map((citation) => (
                     <details
@@ -420,19 +442,25 @@ function Chat({ courseId }: { courseId: string }) {
                     >
                       <summary className="cursor-pointer font-semibold">
                         [S{citation.citationOrder}] {citation.source.displayName}
-                        {citation.pageStart ? ` · p.${citation.pageStart}` : ''}
+                        {citation.pageStart
+                          ? ` · ${t('course.chat.page', { page: citation.pageStart })}`
+                          : ''}
                         {citation.documentChunk?.metadata?.slideNumber
-                          ? ` · slide ${citation.documentChunk.metadata.slideNumber}`
+                          ? ` · ${t('course.chat.slide', { slide: citation.documentChunk.metadata.slideNumber })}`
                           : ''}
                         {citation.documentChunk?.metadata?.headingConfidence !== 'low' &&
                         (citation.documentChunk?.metadata?.sectionTitle ||
                           citation.documentChunk?.metadata?.sectionHeading)
                           ? ` · ${citation.documentChunk.metadata.headingPath?.join(' › ') || citation.documentChunk.metadata.sectionTitle || citation.documentChunk.metadata.sectionHeading}`
                           : citation.documentChunk?.metadata?.chunkIndex !== undefined
-                            ? ` · chunk ${citation.documentChunk.metadata.chunkIndex + 1}`
+                            ? ` · ${t('course.chat.chunk', { chunk: citation.documentChunk.metadata.chunkIndex + 1 })}`
                             : ''}
                       </summary>
-                      {citation.quotedExcerpt && <p className="mt-2">{citation.quotedExcerpt}</p>}
+                      {citation.quotedExcerpt && (
+                        <p className="mt-2" dir="ltr">
+                          {citation.quotedExcerpt}
+                        </p>
+                      )}
                     </details>
                   ))}
                 </div>
@@ -440,15 +468,13 @@ function Chat({ courseId }: { courseId: string }) {
             </article>
           ))}
           {!messages.data?.length && (
-            <Empty title="Ask your course">
-              {readySources.length
-                ? 'Answers use processed sources and include citations.'
-                : 'Upload a source and wait for its study index to become ready.'}
+            <Empty title={t('course.chat.emptyTitle')}>
+              {readySources.length ? t('course.chat.emptyReady') : t('course.chat.emptyNoSource')}
             </Empty>
           )}
           {busy && (
             <p className="animate-pulse text-sm font-semibold text-brand-600">
-              UniMate is studying your material…
+              {t('course.chat.studying')}
             </p>
           )}
         </div>
@@ -463,7 +489,7 @@ function Chat({ courseId }: { courseId: string }) {
                 void sendRequest(lastRequest.content, lastRequest.mode, lastRequest.action)
               }
             >
-              Retry last message
+              {t('course.chat.retry')}
             </button>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -479,7 +505,7 @@ function Chat({ courseId }: { courseId: string }) {
                   setDraft(item.prompt);
                 }}
               >
-                {item.label}
+                {t(`course.actions.${item.labelKey}`)}
               </button>
             ))}
           </div>
@@ -495,13 +521,13 @@ function Chat({ courseId }: { courseId: string }) {
             >
               {studyActions.map((item) => (
                 <option key={item.action} value={item.action}>
-                  {item.label}
+                  {t(`course.actions.${item.labelKey}`)}
                 </option>
               ))}
             </select>
             <textarea
               className="field min-h-12 resize-y"
-              placeholder="Ask about your material…"
+              placeholder={t('course.chat.placeholder')}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
@@ -517,13 +543,13 @@ function Chat({ courseId }: { courseId: string }) {
               disabled={busy || cooldown.coolingDown || !readySources.length || !draft.trim()}
             >
               {busy
-                ? 'Thinking…'
+                ? t('course.chat.thinking')
                 : cooldown.coolingDown
-                  ? `Wait ${formatAiCooldown(cooldown.secondsRemaining)}`
-                  : 'Send'}
+                  ? t('common.wait', { time: formatAiCooldown(cooldown.secondsRemaining) })
+                  : t('course.chat.send')}
             </button>
           </div>
-          <p className="mt-1 text-xs text-slate-400">Enter to send · Shift+Enter for a new line</p>
+          <p className="mt-1 text-xs text-slate-400">{t('course.chat.shortcut')}</p>
         </form>
       </section>
     </div>
@@ -531,6 +557,7 @@ function Chat({ courseId }: { courseId: string }) {
 }
 
 function Explain({ courseId }: { courseId: string }) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState('STANDARD');
   const [result, setResult] = useState<Summary>();
   const [error, setError] = useState<unknown>();
@@ -555,21 +582,21 @@ function Explain({ courseId }: { courseId: string }) {
       <div
         className={`rounded-xl px-3 py-2 text-sm font-medium ${aiStatus.data?.mode === 'AI_TUTOR' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}
       >
-        {aiStatus.data?.message ?? 'Checking tutor mode…'}
+        {aiStatus.data
+          ? t(aiStatus.data.mode === 'AI_TUTOR' ? 'course.aiTutorMessage' : 'course.demoMessage')
+          : t('course.checkingTutor')}
       </div>
       <div className="card flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">Explain lecture</h2>
-          <p className="text-sm text-slate-500">
-            Build a structured explanation across all ready sources.
-          </p>
+          <h2 className="text-xl font-bold">{t('course.explain.title')}</h2>
+          <p className="text-sm text-slate-500">{t('course.explain.description')}</p>
         </div>
         <div className="flex gap-2">
           <select className="field" value={mode} onChange={(event) => setMode(event.target.value)}>
-            <option value="SIMPLE">Simple</option>
-            <option value="STANDARD">Standard</option>
-            <option value="DETAILED">Detailed</option>
-            <option value="EXAM_PREPARATION">Exam preparation</option>
+            <option value="SIMPLE">{t('course.explain.simple')}</option>
+            <option value="STANDARD">{t('course.explain.standard')}</option>
+            <option value="DETAILED">{t('course.explain.detailed')}</option>
+            <option value="EXAM_PREPARATION">{t('course.explain.examPreparation')}</option>
           </select>
           <button
             className="btn-primary"
@@ -577,24 +604,26 @@ function Explain({ courseId }: { courseId: string }) {
             onClick={() => void generate()}
           >
             {busy
-              ? 'Generating…'
+              ? t('common.generating')
               : cooldown.coolingDown
-                ? `Wait ${formatAiCooldown(cooldown.secondsRemaining)}`
-                : 'Generate explanation'}
+                ? t('common.wait', { time: formatAiCooldown(cooldown.secondsRemaining) })
+                : t('course.explain.button')}
           </button>
         </div>
       </div>
       <ErrorBox error={error} />
       {result ? (
         <article className="card">
-          <h3 className="text-xl font-bold">{result.title}</h3>
+          <h3 className="text-xl font-bold" dir="ltr">
+            {result.title}
+          </h3>
           <div className="mt-4">
             <MarkdownContent content={result.content} />
           </div>
           <SourcesAfterAnswer sources={result.sources} />
         </article>
       ) : (
-        <Empty title="No explanation generated yet" />
+        <Empty title={t('course.explain.empty')} />
       )}
     </div>
   );
@@ -602,6 +631,7 @@ function Explain({ courseId }: { courseId: string }) {
 
 type Note = { id: string; title: string; content: string };
 function Notes({ courseId }: { courseId: string }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: ['notes', courseId],
@@ -621,10 +651,14 @@ function Notes({ courseId }: { courseId: string }) {
   return (
     <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
       <form className="card h-fit space-y-3" onSubmit={create}>
-        <h2 className="font-bold">New note</h2>
-        <input className="field" name="title" placeholder="Note title" required />
-        <textarea className="field min-h-40" name="content" placeholder="Markdown supported" />
-        <button className="btn-primary">Save note</button>
+        <h2 className="font-bold">{t('course.notes.new')}</h2>
+        <input className="field" name="title" placeholder={t('course.notes.title')} required />
+        <textarea
+          className="field min-h-40"
+          name="content"
+          placeholder={t('course.notes.markdown')}
+        />
+        <button className="btn-primary">{t('course.notes.save')}</button>
       </form>
       <div className="space-y-3">
         {query.data?.length ? (
@@ -637,7 +671,7 @@ function Notes({ courseId }: { courseId: string }) {
             </article>
           ))
         ) : (
-          <Empty title="No notes yet" />
+          <Empty title={t('course.notes.empty')} />
         )}
       </div>
     </div>
@@ -655,10 +689,13 @@ type Summary = {
   sources?: SourceReference[];
 };
 function SourcesAfterAnswer({ sources }: { sources: SourceReference[] | undefined }) {
+  const { t } = useTranslation();
   if (!sources?.length) return null;
   return (
     <section className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Sources</p>
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {t('common.sources')}
+      </p>
       <ul className="mt-2 space-y-2">
         {sources.map(({ source }, index) => (
           <li
@@ -666,7 +703,7 @@ function SourcesAfterAnswer({ sources }: { sources: SourceReference[] | undefine
             key={source.id}
           >
             [D{index + 1}] {source.displayName}
-            {source.pageCount ? ` · ${source.pageCount} pages` : ''}
+            {source.pageCount ? ` · ${t('common.pages', { count: source.pageCount })}` : ''}
           </li>
         ))}
       </ul>
@@ -674,6 +711,7 @@ function SourcesAfterAnswer({ sources }: { sources: SourceReference[] | undefine
   );
 }
 function Summaries({ courseId }: { courseId: string }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [error, setError] = useState<unknown>();
   const [type, setType] = useState('KEY_POINTS');
@@ -698,15 +736,15 @@ function Summaries({ courseId }: { courseId: string }) {
     <div className="space-y-5">
       <div className="flex flex-wrap justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold">Saved summaries</h2>
-          <p className="text-sm text-slate-500">Generate key points from ready course sources.</p>
+          <h2 className="text-xl font-bold">{t('course.summaries.title')}</h2>
+          <p className="text-sm text-slate-500">{t('course.summaries.description')}</p>
         </div>
         <div className="flex gap-2">
           <select className="field" value={type} onChange={(event) => setType(event.target.value)}>
-            <option value="KEY_POINTS">Key points</option>
-            <option value="SHORT">Short</option>
-            <option value="DETAILED">Detailed</option>
-            <option value="EXAM_REVISION">Exam revision</option>
+            <option value="KEY_POINTS">{t('course.summaries.keyPoints')}</option>
+            <option value="SHORT">{t('course.summaries.short')}</option>
+            <option value="DETAILED">{t('course.summaries.detailed')}</option>
+            <option value="EXAM_REVISION">{t('course.summaries.examRevision')}</option>
           </select>
           <button
             className="btn-primary"
@@ -715,10 +753,10 @@ function Summaries({ courseId }: { courseId: string }) {
           >
             <Sparkles size={16} />
             {busy
-              ? 'Generating…'
+              ? t('common.generating')
               : cooldown.coolingDown
-                ? `Wait ${formatAiCooldown(cooldown.secondsRemaining)}`
-                : 'Generate'}
+                ? t('common.wait', { time: formatAiCooldown(cooldown.secondsRemaining) })
+                : t('common.generate')}
           </button>
         </div>
       </div>
@@ -726,8 +764,14 @@ function Summaries({ courseId }: { courseId: string }) {
       {query.data?.length ? (
         query.data.map((summary) => (
           <article className="card" key={summary.id}>
-            <p className="text-xs font-bold text-brand-600">{summary.type.replaceAll('_', ' ')}</p>
-            <h3 className="mt-1 text-lg font-bold">{summary.title}</h3>
+            <p className="text-xs font-bold text-brand-600">
+              {t(
+                `course.summaries.${summary.type === 'KEY_POINTS' ? 'keyPoints' : summary.type === 'EXAM_REVISION' ? 'examRevision' : summary.type.toLowerCase()}`,
+              )}
+            </p>
+            <h3 className="mt-1 text-lg font-bold" dir="ltr">
+              {summary.title}
+            </h3>
             <div className="mt-4 text-sm">
               <MarkdownContent content={summary.content} />
             </div>
@@ -735,7 +779,7 @@ function Summaries({ courseId }: { courseId: string }) {
           </article>
         ))
       ) : (
-        <Empty title="No summaries yet" />
+        <Empty title={t('course.summaries.empty')} />
       )}
     </div>
   );
@@ -747,6 +791,7 @@ type CardSet = {
   cards: { id: string; front: string; back: string; topic: string }[];
 };
 function Flashcards({ courseId }: { courseId: string }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [flipped, setFlipped] = useState<string>();
   const [error, setError] = useState<unknown>();
@@ -776,10 +821,10 @@ function Flashcards({ courseId }: { courseId: string }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap justify-between gap-3">
-        <h2 className="text-xl font-bold">Flashcards</h2>
+        <h2 className="text-xl font-bold">{t('course.flashcards.title')}</h2>
         <div className="flex gap-2">
           <input
-            aria-label="Number of flashcards"
+            aria-label={t('course.flashcards.count')}
             className="field w-24"
             type="number"
             min="1"
@@ -791,17 +836,15 @@ function Flashcards({ courseId }: { courseId: string }) {
             className="btn-primary"
             disabled={busy || cooldown.coolingDown || aiStatus.data?.mode === 'DEMO'}
             title={
-              aiStatus.data?.mode === 'DEMO'
-                ? 'Flashcard generation requires AI Tutor mode.'
-                : undefined
+              aiStatus.data?.mode === 'DEMO' ? t('course.flashcards.requiresTutor') : undefined
             }
             onClick={() => void generate()}
           >
             {busy
-              ? 'Generating…'
+              ? t('common.generating')
               : cooldown.coolingDown
-                ? `Wait ${formatAiCooldown(cooldown.secondsRemaining)}`
-                : 'Generate cards'}
+                ? t('common.wait', { time: formatAiCooldown(cooldown.secondsRemaining) })
+                : t('course.flashcards.generate')}
           </button>
         </div>
       </div>
@@ -812,20 +855,22 @@ function Flashcards({ courseId }: { courseId: string }) {
             ?.flatMap((set) => set.cards)
             .map((card) => (
               <button
-                className="card min-h-48 text-left"
+                className="card min-h-48 text-start"
                 key={card.id}
                 onClick={() => setFlipped(flipped === card.id ? undefined : card.id)}
               >
-                <p className="text-xs font-bold text-brand-600">{card.topic}</p>
-                <p className="mt-5 text-lg font-semibold">
+                <p className="text-xs font-bold text-brand-600" dir="ltr">
+                  {card.topic}
+                </p>
+                <p className="mt-5 text-lg font-semibold" dir="ltr">
                   {flipped === card.id ? card.back : card.front}
                 </p>
-                <small className="mt-5 block text-slate-400">Click to flip</small>
+                <small className="mt-5 block text-slate-400">{t('course.flashcards.flip')}</small>
               </button>
             ))}
         </div>
       ) : (
-        <Empty title="No flashcards yet" />
+        <Empty title={t('course.flashcards.empty')} />
       )}
     </div>
   );
@@ -838,6 +883,7 @@ type Quiz = {
   _count: { questions: number; attempts: number };
 };
 function Quizzes({ courseId }: { courseId: string }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [error, setError] = useState<unknown>();
@@ -879,10 +925,10 @@ function Quizzes({ courseId }: { courseId: string }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap justify-between gap-3">
-        <h2 className="text-xl font-bold">Practice quizzes</h2>
+        <h2 className="text-xl font-bold">{t('course.quizzes.title')}</h2>
         <div className="flex flex-wrap gap-2">
           <input
-            aria-label="Number of questions"
+            aria-label={t('course.quizzes.count')}
             className="field w-24"
             type="number"
             min="1"
@@ -895,35 +941,33 @@ function Quizzes({ courseId }: { courseId: string }) {
             value={questionType}
             onChange={(event) => setQuestionType(event.target.value)}
           >
-            <option value="MULTIPLE_CHOICE">Multiple choice</option>
-            <option value="TRUE_FALSE">True / False</option>
-            <option value="SHORT_ANSWER">Short answer</option>
-            <option value="ESSAY">Essay</option>
-            <option value="PROBLEM_SOLVING">Problem solving</option>
+            <option value="MULTIPLE_CHOICE">{t('course.quizzes.multipleChoice')}</option>
+            <option value="TRUE_FALSE">{t('course.quizzes.trueFalse')}</option>
+            <option value="SHORT_ANSWER">{t('course.quizzes.shortAnswer')}</option>
+            <option value="ESSAY">{t('course.quizzes.essay')}</option>
+            <option value="PROBLEM_SOLVING">{t('course.quizzes.problemSolving')}</option>
           </select>
           <select
             className="field w-auto"
             value={difficulty}
             onChange={(event) => setDifficulty(event.target.value)}
           >
-            <option value="EASY">Easy</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HARD">Hard</option>
-            <option value="MIXED">Mixed</option>
+            <option value="EASY">{t('course.quizzes.easy')}</option>
+            <option value="MEDIUM">{t('course.quizzes.medium')}</option>
+            <option value="HARD">{t('course.quizzes.hard')}</option>
+            <option value="MIXED">{t('course.quizzes.mixed')}</option>
           </select>
           <button
             className="btn-primary"
             disabled={busy || cooldown.coolingDown || aiStatus.data?.mode === 'DEMO'}
-            title={
-              aiStatus.data?.mode === 'DEMO' ? 'Quiz generation requires AI Tutor mode.' : undefined
-            }
+            title={aiStatus.data?.mode === 'DEMO' ? t('course.quizzes.requiresTutor') : undefined}
             onClick={() => void generate()}
           >
             {busy
-              ? 'Generating…'
+              ? t('common.generating')
               : cooldown.coolingDown
-                ? `Wait ${formatAiCooldown(cooldown.secondsRemaining)}`
-                : 'Generate quiz'}
+                ? t('common.wait', { time: formatAiCooldown(cooldown.secondsRemaining) })
+                : t('course.quizzes.generate')}
           </button>
         </div>
       </div>
@@ -932,19 +976,22 @@ function Quizzes({ courseId }: { courseId: string }) {
         query.data.map((quiz) => (
           <div className="card flex items-center justify-between" key={quiz.id}>
             <div>
-              <h3 className="font-bold">{quiz.title}</h3>
+              <h3 className="font-bold" dir="ltr">
+                {quiz.title}
+              </h3>
               <p className="text-sm text-slate-500">
-                {quiz._count.questions} questions · {quiz.difficulty.toLowerCase()} ·{' '}
-                {quiz._count.attempts} attempts
+                {t('common.questions', { count: quiz._count.questions })} ·{' '}
+                {t(`course.quizzes.${quiz.difficulty.toLowerCase()}`)} ·{' '}
+                {t('common.attempts', { count: quiz._count.attempts })}
               </p>
             </div>
             <button className="btn-secondary" onClick={() => void start(quiz.id)}>
-              Start
+              {t('course.quizzes.start')}
             </button>
           </div>
         ))
       ) : (
-        <Empty title="No quizzes yet" />
+        <Empty title={t('course.quizzes.empty')} />
       )}
     </div>
   );
@@ -959,6 +1006,7 @@ type ProgressData = {
   disclaimer: string;
 };
 function Progress({ courseId }: { courseId: string }) {
+  const { t } = useTranslation();
   const query = useQuery({
     queryKey: ['progress', courseId],
     queryFn: () => api.get<ProgressData>(`/courses/${courseId}/progress`),
@@ -967,12 +1015,14 @@ function Progress({ courseId }: { courseId: string }) {
   const data = query.data;
   return (
     <div className="space-y-5">
-      <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{data?.disclaimer}</p>
+      <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+        {t('course.progress.disclaimer')}
+      </p>
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          ['Ready documents', data?.documents ?? 0],
-          ['Quizzes completed', data?.quizzesCompleted ?? 0],
-          ['Average quiz score', `${Math.round(data?.averageQuizScore ?? 0)}%`],
+          [t('course.progress.documents'), data?.documents ?? 0],
+          [t('course.progress.completed'), data?.quizzesCompleted ?? 0],
+          [t('course.progress.average'), `${Math.round(data?.averageQuizScore ?? 0)}%`],
         ].map(([label, value]) => (
           <div className="card" key={label}>
             <p className="text-sm text-slate-500">{label}</p>
@@ -981,7 +1031,7 @@ function Progress({ courseId }: { courseId: string }) {
         ))}
       </div>
       <section className="card">
-        <h2 className="mb-4 text-lg font-bold">Topic mastery</h2>
+        <h2 className="mb-4 text-lg font-bold">{t('course.progress.mastery')}</h2>
         {data?.weakTopics.length ? (
           data.weakTopics.map((topic) => (
             <div className="mb-4" key={topic.id}>
@@ -998,7 +1048,7 @@ function Progress({ courseId }: { courseId: string }) {
             </div>
           ))
         ) : (
-          <p className="text-sm text-slate-500">Complete a quiz to identify weak topics.</p>
+          <p className="text-sm text-slate-500">{t('course.progress.empty')}</p>
         )}
       </section>
     </div>
