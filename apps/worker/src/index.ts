@@ -1,5 +1,3 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import {
   createAIProvider,
@@ -7,19 +5,36 @@ import {
   loadRootEnvironment,
   safeAIStartupLines,
 } from '@unimate/ai';
+import {
+  createStorage,
+  createStorageForProvider,
+  loadStorageEnvironment,
+  safeStorageStartupLine,
+} from '@unimate/storage';
 import { SourceProcessorService } from './services/source-processor.service.js';
 
 const prisma = new PrismaClient();
 const rootEnvironment = loadRootEnvironment();
 const aiEnvironment = loadAIEnvironment(rootEnvironment);
-const runtimeEnvironment = { ...rootEnvironment, ...process.env };
+// Match AI configuration precedence: explicit root deployment settings win over
+// workspace-local values that may be loaded as import side effects.
+const runtimeEnvironment = { ...process.env, ...rootEnvironment };
+const storageEnvironment = loadStorageEnvironment(runtimeEnvironment);
 const workerId = `worker-${process.pid}`;
 const interval = Number(runtimeEnvironment.WORKER_POLL_INTERVAL_MS ?? 2000);
-const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const storageRoot = path.resolve(
-  repositoryRoot,
-  runtimeEnvironment.LOCAL_STORAGE_PATH ?? 'uploads',
-);
+const storage = createStorage(storageEnvironment);
+const storageProviders = new Map<string, ReturnType<typeof createStorage>>([
+  [storage.provider, storage],
+]);
+const storageForProvider = (provider: string) => {
+  if (provider !== 'local' && provider !== 'r2')
+    throw new Error(`Unsupported storage provider: ${provider}`);
+  const existing = storageProviders.get(provider);
+  if (existing) return existing;
+  const created = createStorageForProvider(provider, storageEnvironment);
+  storageProviders.set(provider, created);
+  return created;
+};
 const ai = createAIProvider({
   provider: aiEnvironment.AI_PROVIDER,
   apiKey: aiEnvironment.AI_API_KEY,
@@ -34,7 +49,7 @@ const ai = createAIProvider({
   log: (level, message, metadata) =>
     level === 'error' ? console.error(message, metadata) : console.warn(message, metadata),
 });
-const processor = new SourceProcessorService(prisma, ai, storageRoot);
+const processor = new SourceProcessorService(prisma, ai, storageForProvider);
 
 async function claimJob() {
   return prisma.$transaction(async (tx) => {
@@ -98,7 +113,11 @@ async function tick() {
   }
 }
 
+console.warn(
+  'DEPRECATED: standalone worker started. Source processing now runs inside the API; do not run both in production.',
+);
 console.log(`UniMate worker ${workerId} started with ${ai.name}/${ai.embeddingModel}`);
+console.log(safeStorageStartupLine(storageEnvironment));
 if ((process.env.NODE_ENV ?? 'development') === 'development') {
   for (const line of safeAIStartupLines(aiEnvironment)) console.log(line);
 }

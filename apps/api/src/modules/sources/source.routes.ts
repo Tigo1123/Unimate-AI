@@ -4,9 +4,10 @@ import { Router } from 'express';
 import multer from 'multer';
 import { env } from '../../config/env.js';
 import { prisma } from '../../infrastructure/database/prisma.js';
-import { storage } from '../../infrastructure/storage/storage.js';
+import { storage, storageForProvider } from '../../infrastructure/storage/storage.js';
 import { AppError, notFound } from '../../shared/errors/app-error.js';
 import { ok } from '../../shared/http/respond.js';
+import { sourceProcessing } from '../../infrastructure/source-processing/source-processing.runner.js';
 
 const router = Router();
 const formats = new Map([
@@ -60,7 +61,7 @@ router.post('/courses/:courseId/sources', upload.single('file'), async (req, res
     .replace(/[^a-zA-Z0-9._ -]/g, '_')
     .slice(0, 180);
   const key = `${req.user!.id}/${req.params.courseId}/${randomUUID()}${extension}`;
-  await storage.put(key, file.buffer);
+  await storage.put(key, file.buffer, mimeType);
   try {
     const source = await prisma.source.create({
       data: {
@@ -98,6 +99,7 @@ router.post('/courses/:courseId/sources', upload.single('file'), async (req, res
         },
       }),
     ]);
+    sourceProcessing.wake();
     ok(res, source, 201);
   } catch (error) {
     await storage.delete(key);
@@ -156,7 +158,7 @@ router.get('/sources/:id/download', async (req, res) => {
     'Content-Disposition',
     `attachment; filename*=UTF-8''${encodeURIComponent(source.displayName)}`,
   );
-  storage.open(source.storageKey).pipe(res);
+  (await storageForProvider(source.storageProvider).open(source.storageKey)).pipe(res);
 });
 router.patch('/sources/:id', async (req, res) => {
   const displayName = String(req.body.displayName ?? '')
@@ -190,6 +192,7 @@ router.post('/sources/:id/reprocess', async (req, res) => {
       },
     }),
   ]);
+  sourceProcessing.wake();
   ok(res, { queued: true });
 });
 router.delete('/sources/:id', async (req, res) => {
@@ -198,7 +201,7 @@ router.delete('/sources/:id', async (req, res) => {
   });
   if (!source) throw notFound('source');
   await prisma.source.update({ where: { id: source.id }, data: { processingStatus: 'DELETING' } });
-  await storage.delete(source.storageKey);
+  await storageForProvider(source.storageProvider).delete(source.storageKey);
   await prisma.source.delete({ where: { id: source.id } });
   ok(res, { deleted: true });
 });

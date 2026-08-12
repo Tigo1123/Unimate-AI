@@ -5,14 +5,14 @@ UniMate AI is a university-independent study workspace that turns a student's pr
 ## Architecture
 
 - `apps/web`: React, TypeScript, Vite, Tailwind, React Router, TanStack Query
-- `apps/api`: Express REST API, Prisma, JWT access tokens and rotating refresh sessions
-- `apps/worker`: asynchronous PDF/DOCX/PPTX/TXT/Markdown extraction, semantic chunking, and embeddings
+- `apps/api`: Express REST API, Prisma, JWT sessions, and durable in-process source processing
+- `apps/worker`: deprecated standalone source processor retained for a future split deployment
 - `packages/ai`: provider-neutral chat, validated structured generation, and embedding adapters
 - `packages/contracts`: transport validation and shared API types
 - PostgreSQL with pgvector for application data, jobs, and document retrieval
 - Provider interfaces for AI and file storage; deterministic mock AI and local private storage are the development defaults
 
-The MVP is a modular monolith with a separately runnable worker. Every user-owned query is constrained by the authenticated user ID.
+The MVP deploys as a single API process. The API polls durable PostgreSQL jobs for PDF/DOCX/PPTX/TXT/Markdown extraction, semantic chunking, and embeddings. Interrupted jobs use a stale lease and are safely re-queued when the API wakes or restarts. Every user-owned query is constrained by the authenticated user ID.
 
 ## Prerequisites
 
@@ -61,7 +61,7 @@ The provider has configurable timeouts, transient retries, output limits, batch 
 
 1. Start PostgreSQL and run `npm run db:migrate`.
 2. Run `npm run dev`, then register or sign in at `http://localhost:5173`.
-3. Create a semester and course, upload a supported lecture, and keep the worker running.
+3. Create a semester and course and upload a supported lecture. The API processes it asynchronously in-process.
 4. Wait for the source to move through “Creating study index” and “Processing” to “Ready”. Failed sources remain available and can be retried.
 5. Generate a summary, explanation, flashcards, or quiz from the course tabs.
 6. Open AI Chat, select all ready sources or an explicit subset, ask a question answered by the lecture, and expand the returned citations to inspect the supporting excerpt.
@@ -69,12 +69,14 @@ The provider has configurable timeouts, transient retries, output limits, batch 
 
 ## Storage
 
-Local files are written beneath `uploads/`, outside the public web root. Downloads always pass through an ownership-checked API endpoint. Production object storage should implement the existing `StorageService` interface.
+`STORAGE_PROVIDER=local` writes beneath `uploads/`, outside the public web root. `STORAGE_PROVIDER=r2` uses Cloudflare R2 through its S3-compatible API. Downloads always pass through an ownership-checked API endpoint.
 
 ## Commands
 
 ```bash
 npm run dev
+# Optional deprecated split topology for development only:
+npm run dev:with-worker
 npm run typecheck
 npm run lint
 npm run test

@@ -13,6 +13,7 @@ import { coreRouter } from './modules/core/core.routes.js';
 import { sourceRouter } from './modules/sources/source.routes.js';
 import { studyRouter } from './modules/study/study.routes.js';
 import { aiUsageRouter } from './modules/ai-usage/ai-usage.routes.js';
+import { sourceProcessing } from './infrastructure/source-processing/source-processing.runner.js';
 
 export const app = express();
 app.disable('x-powered-by');
@@ -30,7 +31,12 @@ app.use(
   '/api/v1',
   rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: 'draft-7', legacyHeaders: false }),
 );
-app.get('/health', (_req, res) => res.json({ success: true, data: { status: 'ok' } }));
+app.get('/health', (_req, res) =>
+  res.json({
+    success: true,
+    data: { status: 'ok', sourceProcessing: sourceProcessing.status() },
+  }),
+);
 app.use('/api/v1/auth', rateLimit({ windowMs: 15 * 60_000, limit: 30 }), authRouter);
 app.use('/api/v1', requireAuth, coreRouter, sourceRouter, studyRouter, aiUsageRouter);
 app.use(notFoundHandler);

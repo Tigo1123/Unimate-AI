@@ -31,17 +31,39 @@ const aiEnvironmentSchema = z
 
 export type AIEnvironment = z.infer<typeof aiEnvironmentSchema>;
 
-export function loadRootEnvironment(): Record<string, string> {
+const rootEnvironmentMarkers = ['AI_PROVIDER', 'AI_MODEL', 'EMBEDDING_MODEL'] as const;
+
+function hasPlatformEnvironment(environment: NodeJS.ProcessEnv | Record<string, unknown>) {
+  return rootEnvironmentMarkers.every((key) => {
+    const value = environment[key];
+    return typeof value === 'string' && Boolean(value.trim());
+  });
+}
+
+export function loadRootEnvironment(
+  environment: NodeJS.ProcessEnv | Record<string, unknown> = process.env,
+  environmentFilePath = rootEnvPath,
+): Record<string, string> {
+  // Hosting platforms inject configuration directly. Do not require or parse a
+  // repository .env file when the minimum shared runtime configuration is present.
+  if (hasPlatformEnvironment(environment)) return {};
+
   const rootValues: Record<string, string> = {};
-  const result = loadDotenv({ path: rootEnvPath, processEnv: rootValues });
-  if (result.error) throw new Error(`Unable to load the root environment file at ${rootEnvPath}.`);
+  const result = loadDotenv({ path: environmentFilePath, processEnv: rootValues });
+  if (result.error || !hasPlatformEnvironment({ ...environment, ...rootValues }))
+    throw new Error(
+      `Unable to load the root environment file at ${environmentFilePath}, and required environment variables are not present in process.env.`,
+    );
   return rootValues;
 }
 
-export function loadAIEnvironment(rootEnvironment = loadRootEnvironment()): AIEnvironment {
+export function loadAIEnvironment(
+  rootEnvironment = loadRootEnvironment(),
+  processEnvironment: NodeJS.ProcessEnv | Record<string, unknown> = process.env,
+): AIEnvironment {
   // Root AI values deliberately win over workspace-local values loaded as import
   // side effects. Other runtime settings can still be overridden by the process.
-  const environment = aiEnvironmentSchema.parse({ ...process.env, ...rootEnvironment });
+  const environment = aiEnvironmentSchema.parse({ ...processEnvironment, ...rootEnvironment });
   if (environment.EMBEDDING_DIMENSIONS !== 1536) {
     throw new Error('EMBEDDING_DIMENSIONS must remain 1536 for the current pgvector schema.');
   }

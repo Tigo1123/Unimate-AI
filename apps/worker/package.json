@@ -13,6 +13,7 @@
   "dependencies": {
     "@prisma/client": "^6.2.1",
     "@unimate/ai": "*",
+    "@unimate/storage": "*",
     "jszip": "^3.10.1",
     "mammoth": "^1.9.0",
     "pdfjs-dist": "^4.10.38"

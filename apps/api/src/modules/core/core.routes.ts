@@ -5,7 +5,7 @@ import { prisma } from '../../infrastructure/database/prisma.js';
 import { validate } from '../../middleware/validate.js';
 import { AppError, notFound } from '../../shared/errors/app-error.js';
 import { ok } from '../../shared/http/respond.js';
-import { storage } from '../../infrastructure/storage/storage.js';
+import { storageForProvider } from '../../infrastructure/storage/storage.js';
 
 const router = Router();
 const patchSemester = semesterSchema.partial();
@@ -241,9 +241,10 @@ router.get('/dashboard', async (req, res) => {
 router.delete('/account', async (req, res) => {
   const sources = await prisma.source.findMany({
     where: { userId: req.user!.id },
-    select: { storageKey: true },
+    select: { storageKey: true, storageProvider: true },
   });
-  for (const source of sources) await storage.delete(source.storageKey);
+  for (const source of sources)
+    await storageForProvider(source.storageProvider).delete(source.storageKey);
   await prisma.user.delete({ where: { id: req.user!.id } });
   res.clearCookie('unimate_refresh', { path: '/api/v1/auth' });
   ok(res, { deleted: true });
